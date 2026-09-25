@@ -1,122 +1,102 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useEffect } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { useStore } from './store.jsx';
+import { CVD_THEME } from './lib/cvd.js';
+import Navbar from './components/Navbar.jsx';
+import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
+import TestDaltonismo from './pages/TestDaltonismo.jsx';
+import TeacherHome from './pages/TeacherHome.jsx';
+import StudentHome from './pages/StudentHome.jsx';
+import CoursePage from './pages/CoursePage.jsx';
 
-function App() {
-  const [count, setCount] = useState(0)
+function Private({ children }) {
+  const { user } = useStore();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'student' && user.profile === 'daltonismo' && !user.testDone) {
+    return <Navigate to="/test-daltonismo" replace />;
+  }
+  return children;
+}
+
+function RootRedirect() {
+  const { user } = useStore();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'student' && user.profile === 'daltonismo' && !user.testDone) {
+    return <Navigate to="/test-daltonismo" replace />;
+  }
+  return <Navigate to="/inicio" replace />;
+}
+
+// Aplica (o quita) la paleta de daltonismo sobre <html>, así el cambio de
+// color alcanza a toda la página -incluido el fondo del body- y no solo a
+// lo que está dentro de un contenedor de React.
+function useCvdTheme(cvdType, active) {
+  useEffect(() => {
+    const root = document.documentElement;
+    const vars = active && cvdType ? CVD_THEME[cvdType] : null;
+
+    if (vars) {
+      Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+    }
+    root.classList.toggle('cvd-mono', Boolean(vars) && cvdType === 'acromatopsia');
+
+    return () => {
+      if (vars) Object.keys(vars).forEach((k) => root.style.removeProperty(k));
+      root.classList.remove('cvd-mono');
+    };
+  }, [cvdType, active]);
+}
+
+export default function App() {
+  const { user, authReady } = useStore();
+  const cvdType = user?.role === 'student' && user.profile === 'daltonismo' ? user.cvdType : null;
+  const themeActive = Boolean(cvdType && CVD_THEME[cvdType] && user.prefs?.filterOn !== false);
+
+  useCvdTheme(cvdType, themeActive);
+
+  // La sesión vive en una cookie del backend, no en localStorage: al abrir
+  // o refrescar la app hay que preguntar primero quién está logueado antes
+  // de decidir a qué pantalla mandar a la persona.
+  if (!authReady) {
+    return (
+      <div className="d-flex align-items-center justify-content-center" style={{ minHeight: '100vh' }}>
+        <div className="text-muted-strong">
+          <i className="bi bi-mortarboard-fill me-2" aria-hidden="true" /> Cargando Aula Inclusiva…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      {user && <Navbar />}
+      <Routes>
+        <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+        <Route path="/registro" element={user ? <Navigate to="/" replace /> : <Register />} />
+        <Route
+          path="/test-daltonismo"
+          element={!user ? <Navigate to="/login" replace /> : <TestDaltonismo />}
+        />
+        <Route
+          path="/inicio"
+          element={
+            <Private>
+              {user?.role === 'teacher' ? <TeacherHome /> : <StudentHome />}
+            </Private>
+          }
+        />
+        <Route
+          path="/materia/:courseId"
+          element={
+            <Private>
+              <CoursePage />
+            </Private>
+          }
+        />
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="*" element={<RootRedirect />} />
+      </Routes>
     </>
-  )
+  );
 }
-
-export default App

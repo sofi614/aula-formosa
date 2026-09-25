@@ -1,0 +1,41 @@
+LECTOR CLARO - Lector adaptado para personas con dislexia
+==========================================================
+
+CÓMO USARLO
+1. Descomprimí la carpeta.
+2. Hacé doble clic en index.html (se abre en el navegador: Chrome, Edge o Firefox).
+3. Pegá un texto en el cuadro o tocá "Abrir archivo" para cargar un PDF, un Word (.docx) o un .txt.
+   Para probar, podés abrir "texto-de-prueba.txt".
+
+LAS VISTAS
+- Original:   el texto tal como llegó, sin cambios.
+- Adaptado:   configuración fija recomendada (Lexend 20 px, entre letras 0.22 em,
+              entre palabras 0.52 em, interlineado 2.00, ancho 65 caracteres, fondo crema).
+              No se puede modificar.
+- Ajustable:  la única vista con el panel de opciones (fuente, tamaño, espaciados,
+              colores y contraste, frase por renglón, tramos, números resaltados,
+              regla de lectura, velocidad de la voz).
+
+ADAPTACIÓN AUTOMÁTICA (sin cambiar palabras)
+- Une renglones cortados y repara palabras partidas con guion.
+- Divide párrafos largos y pone una frase por renglón.
+- Corta las frases de más de 25 palabras en tramos.
+- Pasa números escritos en letras a cifras: "setenta y cinco por ciento (75%)" -> "75%".
+- Resalta números, fechas y plazos.
+- Pasa los títulos en MAYÚSCULAS a minúsculas y detecta listas.
+
+REQUISITOS
+- Necesita conexión a internet: las fuentes (Lexend, Atkinson Hyperlegible) y las
+  librerías para leer PDF (pdf.js) y Word (mammoth) se cargan desde internet.
+- Los archivos se procesan en tu computadora; no se suben a ningún lado.
+- OpenDyslexic: si está instalada en tu equipo se usa sola; si no, se descarga gratis
+  en https://opendyslexic.org y se carga desde el panel de la vista Ajustable.
+- Los ajustes y el último texto pegado quedan guardados en ese navegador.
+
+LIMITACIONES
+- "Simplificar con IA" solo funciona dentro de Claude (claude.ai). En esta versión
+  descargada esa opción no aparece.
+- Los PDF escaneados (imágenes sin texto) necesitan pasar antes por un OCR.
+- Los .doc antiguos hay que guardarlos como .docx.
+- Si una palabra con guion propio (ej. "teórico-prácticas") queda cortada justo al
+  final de un renglón, se une sin el guion.

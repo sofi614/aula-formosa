@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>[hidden]{display:none!important} body{margin:0} img{max-width:100%}</style>
+<title>Lector Claro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Lexend:wght@300;400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<style>
+  @font-face {
+    font-family: "OpenDyslexicLocal";
+    src: local("OpenDyslexic"), local("OpenDyslexic-Regular"), local("OpenDyslexic Regular");
+  }
+  :root {
+    --bg: #eef1ef; --panel: #ffffff; --ink: #1d2a2e; --muted: #56676c; --line: #d3dbd8;
+    --accent: #1f6f78; --accent-ink: #ffffff; --accent-soft: #dcecec;
+    --warn: #9a5b00; --warn-soft: #fbeed8; --ok: #2d7a3e;
+    --shadow: 0 1px 2px rgba(20,40,45,.06), 0 8px 24px rgba(20,40,45,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #131a1c; --panel: #1b2326; --ink: #e2eae8; --muted: #97a8ab; --line: #2e3a3d;
+      --accent: #62b8c0; --accent-ink: #0d1a1c; --accent-soft: #1f3538;
+      --warn: #e0a54a; --warn-soft: #3a2e1c; --ok: #6fc783; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #131a1c; --panel: #1b2326; --ink: #e2eae8; --muted: #97a8ab; --line: #2e3a3d;
+    --accent: #62b8c0; --accent-ink: #0d1a1c; --accent-soft: #1f3538;
+    --warn: #e0a54a; --warn-soft: #3a2e1c; --ok: #6fc783; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Atkinson Hyperlegible", Verdana, Arial, sans-serif;
+    font-size: 15px; line-height: 1.5;
+    padding-inline: 16px; padding-block: 20px 40px;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; display: grid; gap: 20px; grid-template-columns: 320px 1fr; align-items: start; }
+  .wrap.no-panel { grid-template-columns: 1fr; max-width: 1040px; }
+  aside.panel[hidden] { display: none; }
+  header.top { max-width: 1280px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: end; justify-content: space-between; }
+  h1 { font-family: "Lexend", Verdana, sans-serif; font-weight: 600; font-size: 1.7rem; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+  .sub { color: var(--muted); margin: 4px 0 0; max-width: 62ch; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  button, .btn {
+    font: inherit; font-weight: 700; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    padding: 8px 14px; border-radius: 8px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; position: relative;
+  }
+  button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, .btn:focus-within, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+  aside.panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 18px; display: flex; flex-direction: column; gap: 22px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px);
+    max-height: calc(100vh - 24px); overflow-y: auto;
+  }
+  fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  fieldset:disabled { opacity: .42; }
+  fieldset:disabled * { cursor: not-allowed; }
+  .lock { background: var(--accent-soft); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .lock p { margin: 0; font-weight: 700; }
+  .lock button { justify-content: center; }
+  legend { font-family: "Lexend", sans-serif; font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; padding: 0; }
+  label { display: flex; flex-direction: column; gap: 4px; font-weight: 700; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .val { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; font-size: .9rem; }
+  select { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .hint { color: var(--muted); font-size: .85rem; margin: 0; font-weight: 400; }
+  .hint a { color: var(--accent); }
+  .swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .sw { padding: 10px 6px 8px; border-radius: 8px; border: 2px solid var(--line); font-weight: 700; font-size: .82rem; display: flex; flex-direction: column; align-items: center; gap: 2px; justify-content: center; }
+  .sw .aa { font-family: "Lexend", sans-serif; font-size: 1.15rem; line-height: 1; }
+  .sw[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .custom { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .custom label { font-weight: 400; font-size: .85rem; }
+  input[type=color] { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); padding: 2px; }
+  .contrast { display: flex; align-items: center; gap: 8px; font-size: .88rem; flex-wrap: wrap; }
+  .pill { font-weight: 700; padding: 2px 8px; border-radius: 99px; font-size: .78rem; border: 1px solid currentColor; }
+  .pill.ok { color: var(--ok); } .pill.warn { color: var(--warn); }
+  .toggle { flex-direction: row; align-items: flex-start; gap: 10px; font-weight: 700; cursor: pointer; }
+  .toggle input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; margin-top: 2px; }
+  .toggle small { display: block; font-weight: 400; color: var(--muted); font-size: .82rem; }
+
+  main { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .paste { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .paste-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; justify-content: space-between; }
+  .paste-head label { font-family: "Lexend", sans-serif; font-weight: 600; font-size: 1.05rem; flex-direction: row; }
+  textarea { font: inherit; width: 100%; min-height: 84px; resize: vertical; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); line-height: 1.5; }
+  textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .paste-opts .toggle { font-weight: 400; }
+
+  /* resumen de lo que hizo la adaptación */
+  .report { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+  .stat { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .stat b { font-family: "Lexend", sans-serif; font-size: 1.35rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .stat b .from { color: var(--muted); font-weight: 400; font-size: .85em; text-decoration: line-through; margin-right: 4px; }
+  .stat span { font-size: .82rem; color: var(--ink); }
+  .stat.warn { background: var(--warn-soft); }
+
+  .viewbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); }
+  .seg button { border: 0; border-radius: 0; padding: 8px 14px; font-size: .92rem; background: transparent; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+  .ai-state { display: flex; align-items: center; gap: 10px; font-size: .9rem; color: var(--muted); flex-wrap: wrap; }
+  .ai-state button { padding: 6px 12px; font-size: .88rem; }
+  .docline { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; justify-content: space-between; color: var(--muted); font-size: .9rem; }
+  .docname { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+  .tag { font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--ink); margin-left: 6px; }
+  .status.err { color: var(--warn); font-weight: 700; }
+
+  .page {
+    --r-font: "Lexend", Verdana, sans-serif; --r-size: 20px; --r-ls: .22em; --r-ws: .52em; --r-lh: 2; --r-w: 65ch;
+    --r-bg: #FBF5E6; --r-fg: #2B2B2B;
+    background: var(--r-bg); color: var(--r-fg); border-radius: 12px; border: 1px solid var(--line);
+    padding: clamp(20px, 5vw, 56px); position: relative; overflow: hidden; transition: background .25s, color .25s;
+  }
+  .reading {
+    font-family: var(--r-font); font-size: var(--r-size); letter-spacing: var(--r-ls); word-spacing: var(--r-ws); line-height: var(--r-lh);
+    max-width: var(--r-w); margin: 0 auto; text-align: left; hyphens: none; font-style: normal; overflow-wrap: break-word;
+  }
+  .reading p, .reading li { margin: 0 0 calc(var(--r-lh) * .6em); }
+  .reading p { padding-bottom: calc(var(--r-lh) * .25em); }
+  .reading ul, .reading ol { padding-left: 1.4em; }
+  .reading li::marker { font-weight: 700; }
+  .reading h1, .reading h2, .reading h3, .reading h4 {
+    font-family: var(--r-font); line-height: 1.35; margin: 1.4em 0 .7em; font-weight: 700; letter-spacing: var(--r-ls); font-size: 1.25em;
+    padding-bottom: .25em; border-bottom: 3px solid color-mix(in srgb, var(--r-fg) 22%, transparent);
+  }
+  .reading > :first-child { margin-top: 0; }
+  .reading em, .reading i { font-style: normal; font-weight: 700; }
+  .reading u { text-decoration: none; font-weight: 700; }
+  .reading img { max-width: 100%; height: auto; }
+  .reading table { border-collapse: collapse; display: block; overflow-x: auto; }
+  .reading td, .reading th { border: 1px solid currentColor; padding: .3em .6em; }
+  .reading .speaking { background: color-mix(in srgb, var(--r-fg) 14%, transparent); border-radius: 4px; }
+
+  /* una frase por renglón */
+  .reading.per-line .s { display: block; margin-bottom: .45em; }
+  .reading.per-line .s:last-child { margin-bottom: 0; }
+  /* frases largas cortadas en tramos */
+  .reading.chunks .s.long { display: block; border-left: 4px solid color-mix(in srgb, var(--r-fg) 30%, transparent); padding-left: .8em; margin: .3em 0 .7em; }
+  .reading.chunks .s.long .c { display: block; }
+  .reading.chunks .s.long .c + .c { padding-left: 1.2em; }
+  /* números, fechas y plazos resaltados */
+  .reading.nums .n { font-weight: 700; background: color-mix(in srgb, var(--r-fg) 10%, transparent); border-radius: 4px; padding: 0 .18em; }
+  .reading .k { font-weight: 700; }
+
+  /* vista original: así llega el texto sin adaptar */
+  .page.orig { background: #ffffff; color: #3d3d3d; }
+  .orig-view { font-family: "Times New Roman", Times, Georgia, serif; font-size: 15px; line-height: 1.2; text-align: justify; white-space: pre-wrap; letter-spacing: 0; word-spacing: 0; overflow-wrap: break-word; }
+  .orig-label { font-family: "Atkinson Hyperlegible", sans-serif; font-size: .8rem; font-weight: 700; color: #6a6a6a; border: 1px solid #cfcfcf; border-radius: 99px; padding: 2px 10px; display: inline-block; margin-bottom: 14px; letter-spacing: 0; word-spacing: 0; }
+
+  .ruler {
+    position: absolute; left: 0; right: 0; height: calc(var(--r-size) * var(--r-lh) * 1.15); pointer-events: none;
+    box-shadow: 0 0 0 200vmax color-mix(in srgb, var(--r-bg) 35%, rgba(0,0,0,.42));
+    border-top: 2px solid color-mix(in srgb, var(--r-fg) 40%, transparent); border-bottom: 2px solid color-mix(in srgb, var(--r-fg) 40%, transparent);
+    transform: translateY(-50%);
+  }
+  .drop.over .page { outline: 3px dashed var(--accent); outline-offset: 4px; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } aside.panel { position: static; max-height: none; } }
+  @media (prefers-reduced-motion: reduce) { .page { transition: none; } }
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div>
+    <h1>Lector Claro</h1>
+    <p class="sub">Pegá un texto o abrí un PDF, un Word (.docx) o un .txt. Se reorganiza solo para leerlo con dislexia, y después podés ajustar fuente, espaciado y colores. Todo se procesa en tu navegador.</p>
+  </div>
+  <div class="actions">
+    <label class="btn primary" for="file">Abrir archivo
+      <input type="file" id="file" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain">
+    </label>
+    <button type="button" id="pasteBtn">Pegar texto</button>
+    <button type="button" id="speakBtn" aria-pressed="false">Leer en voz alta</button>
+  </div>
+</header>
+
+<div class="wrap no-panel" id="wrap">
+  <aside class="panel" id="panel" aria-label="Ajustes de lectura" hidden>
+    <fieldset>
+      <legend>1 · Fuente</legend>
+      <label for="font">Tipografía
+        <select id="font">
+          <option value='"Lexend", Verdana, sans-serif'>Lexend</option>
+          <option value='"OpenDyslexicLocal", "OpenDyslexic", "OpenDyslexicUser", "Lexend", sans-serif'>OpenDyslexic</option>
+          <option value='"Atkinson Hyperlegible", Verdana, sans-serif'>Atkinson Hyperlegible</option>
+          <option value='Verdana, Geneva, sans-serif'>Verdana</option>
+          <option value='Arial, Helvetica, sans-serif'>Arial / Helvetica</option>
+        </select>
+      </label>
+      <div class="hint" id="odHint" hidden>OpenDyslexic se usa si está instalada en tu equipo. Si no, bajala gratis en <a href="https://opendyslexic.org" target="_blank" rel="noopener">opendyslexic.org</a> y cargá el archivo acá:
+        <label class="btn" for="odFile" style="margin-top:6px">Cargar OpenDyslexic (.otf/.ttf/.woff)
+          <input type="file" id="odFile" accept=".otf,.ttf,.woff,.woff2">
+        </label>
+        <span id="odStatus"></span>
+      </div>
+      <label for="size"><span class="row">Tamaño <span class="val" id="sizeV"></span></span>
+        <input type="range" id="size" min="14" max="36" step="1" value="20"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>2 · Espaciado</legend>
+      <label for="ls"><span class="row">Entre letras <span class="val" id="lsV"></span></span>
+        <input type="range" id="ls" min="0" max="0.35" step="0.01" value="0.05"></label>
+      <label for="ws"><span class="row">Entre palabras <span class="val" id="wsV"></span></span>
+        <input type="range" id="ws" min="0" max="0.8" step="0.02" value="0.16"></label>
+      <label for="lh"><span class="row">Interlineado <span class="val" id="lhV"></span></span>
+        <input type="range" id="lh" min="1.2" max="2.8" step="0.05" value="1.8"></label>
+      <label for="w"><span class="row">Ancho de línea <span class="val" id="wV"></span></span>
+        <input type="range" id="w" min="40" max="90" step="1" value="64"></label>
+      <button type="button" id="preset">Volver al espaciado recomendado</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>3 · Fondo y contraste</legend>
+      <div class="swatches" id="swatches" role="group" aria-label="Combinaciones de color"></div>
+      <div class="custom">
+        <label for="bg">Fondo <input type="color" id="bg" value="#FBF5E6"></label>
+        <label for="fg">Texto <input type="color" id="fg" value="#2B2B2B"></label>
+      </div>
+      <div class="contrast">Contraste <strong id="ratio" style="font-variant-numeric:tabular-nums"></strong> <span class="pill" id="ratioPill"></span></div>
+      <p class="hint">Conviene evitar blanco puro y negro puro: un fondo crema o pastel con texto gris oscuro reduce el deslumbramiento.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>4 · Cómo se arma el texto</legend>
+      <label class="toggle" for="perLine"><input type="checkbox" id="perLine"><span>Una frase por renglón<small>Cada frase empieza en un renglón nuevo.</small></span></label>
+      <label class="toggle" for="chunks"><input type="checkbox" id="chunks"><span>Cortar frases largas en tramos<small>Las frases de más de 25 palabras se muestran por partes.</small></span></label>
+      <label class="toggle" for="nums"><input type="checkbox" id="nums"><span>Resaltar números, fechas y plazos</span></label>
+      <label class="toggle" for="ruler"><input type="checkbox" id="ruler"><span>Regla de lectura<small>Oscurece todo menos el renglón bajo el cursor.</small></span></label>
+      <label for="rate"><span class="row">Velocidad de la voz <span class="val" id="rateV"></span></span>
+        <input type="range" id="rate" min="0.6" max="1.4" step="0.05" value="0.9"></label>
+    </fieldset>
+    <fieldset>
+      <button type="button" id="resetAll">Restablecer todo a lo recomendado</button>
+    </fieldset>
+  </aside>
+
+  <main class="drop" id="drop">
+    <section class="paste" aria-label="Pegar texto">
+      <div class="paste-head">
+        <label for="pasteBox">Pegá tu texto acá y se adapta solo</label>
+        <span class="hint">Sirve texto copiado de un PDF, una web, un mail o un Word.</span>
+      </div>
+      <textarea id="pasteBox" placeholder="Pegá el texto con Ctrl+V (⌘+V en Mac). Se adapta al instante."></textarea>
+      <div class="paste-opts">
+        <label class="toggle" for="autoAi" id="autoAiWrap" hidden><input type="checkbox" id="autoAi"><span>Simplificar también con IA<small>Reescribe en lectura fácil: frases cortas y palabras simples, sin perder datos.</small></span></label>
+      </div>
+    </section>
+
+    <div class="report" id="report" aria-live="polite"></div>
+
+    <div class="viewbar">
+      <div class="seg" role="group" aria-label="Versión del texto">
+        <button type="button" id="viewOrig" aria-pressed="false">Original</button>
+        <button type="button" id="viewAdapted" aria-pressed="true">Adaptado</button>
+        <button type="button" id="viewAdjust" aria-pressed="false">Ajustable</button>
+        <button type="button" id="viewAi" aria-pressed="false" hidden>Simplificado con IA</button>
+      </div>
+      <div class="ai-state" id="aiState" hidden><span id="aiMsg"></span><button type="button" id="aiStop" hidden>Detener</button><button type="button" id="aiRun">Simplificar con IA</button></div>
+    </div>
+    <div class="docline">
+      <div><span class="docname" id="docName">Reglamento de regularidad</span><span class="tag" id="docTag">Texto de ejemplo</span></div>
+      <div class="status" id="status" role="status">Compará Original, Adaptado y Ajustable.</div>
+    </div>
+    <div class="page" id="page">
+      <div class="ruler" id="rulerBar" hidden></div>
+      <article class="reading" id="reading" tabindex="0"></article>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const page = $("page"), reading = $("reading"), box = $("pasteBox");
+
+  const SAMPLE = `REGLAMENTO GENERAL DE REGULARIDAD Y PROMOCION DE ASIGNATURAS CUATRIMESTRALES
+A los efectos de la aplicación del presente reglamento se considerará alumno regu-
+lar a todo aquel estudiante que, habiendo formalizado su inscripción en tiempo y
+forma conforme a lo establecido por el calendario académico vigente, acredite una
+asistencia no inferior al setenta y cinco por ciento (75%) de las clases teórico-
+prácticas efectivamente dictadas, y apruebe la totalidad de las instancias evalua-
+tivas parciales previstas en la planificación de la cátedra, o sus respectivas ins-
+tancias recuperatorias, con una calificación mínima de cuatro (4) puntos sobre una
+escala de diez (10), en cuyo caso quedará habilitado para rendir el examen final
+en cualquiera de los turnos ordinarios comprendidos dentro del plazo de vigencia
+de la regularidad, el cual se extenderá por un período de dos (2) años contados a
+partir de la finalización del cuatrimestre de cursado; transcurrido el cual el
+estudiante perderá automáticamente su condición de regular y deberá recursar la
+asignatura o, en su defecto, rendirla en condición de libre, previa solicitud
+fundada ante la Secretaría Académica. Asimismo, aquellos estudiantes que obtengan
+una calificación promedio igual o superior a siete (7) puntos, sin haber obtenido
+en ninguna instancia una nota inferior a seis (6), accederán al régimen de promo-
+ción directa, quedando eximidos de la instancia de examen final.
+DOCUMENTACION REQUERIDA:
+- Constancia de inscripción emitida por el sistema de gestión académica
+- Certificado analítico parcial actualizado
+- Libreta universitaria o documento que la reemplace
+Las solicitudes que no se ajusten a lo dispuesto precedentemente serán desestimadas sin más trámite.`;
+
+  const THEMES = [
+    { name: "Crema", bg: "#FBF5E6", fg: "#2B2B2B" }, { name: "Durazno", bg: "#FCE9D6", fg: "#2E2420" },
+    { name: "Menta", bg: "#E3F2E7", fg: "#1E2C24" }, { name: "Celeste", bg: "#E2ECF7", fg: "#1B2533" },
+    { name: "Gris", bg: "#E9E9E6", fg: "#222222" }, { name: "Noche", bg: "#1F2326", fg: "#E8E3D6" },
+  ];
+  const DEFAULTS = { font: '"Lexend", Verdana, sans-serif', size: 20, ls: 0.22, ws: 0.52, lh: 2.0, w: 65, bg: "#FBF5E6", fg: "#2B2B2B", ruler: false, rate: 0.9, perLine: true, chunks: true, nums: true };
+  let S = Object.assign({}, DEFAULTS);
+  try { const saved = JSON.parse(localStorage.getItem("lectorClaro") || "null"); if (saved) S = Object.assign(S, saved); } catch (e) {}
+  const save = () => { try { localStorage.setItem("lectorClaro", JSON.stringify(S)); } catch (e) {} };
+
+  // ---------- contraste WCAG ----------
+  function lum(hex) {
+    const n = parseInt(hex.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  }
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const sw = $("swatches");
+  THEMES.forEach(t => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "sw"; b.style.background = t.bg; b.style.color = t.fg;
+    b.innerHTML = '<span class="aa">Aa</span>' + t.name; b.dataset.bg = t.bg; b.dataset.fg = t.fg;
+    b.addEventListener("click", () => { S.bg = t.bg; S.fg = t.fg; apply(); });
+    sw.appendChild(b);
+  });
+
+  // "Adaptado" usa siempre la configuración recomendada; solo "Ajustable" (y la versión IA) toma lo que elige el usuario
+  const FIXED = Object.assign({}, DEFAULTS, { ruler: false });
+  const isAdjustable = () => view === "adjust" || view === "ai";
+  function apply() {
+    const E = isAdjustable() ? S : FIXED;
+    const st = page.style;
+    st.setProperty("--r-font", E.font); st.setProperty("--r-size", E.size + "px");
+    st.setProperty("--r-ls", E.ls + "em"); st.setProperty("--r-ws", E.ws + "em");
+    st.setProperty("--r-lh", E.lh); st.setProperty("--r-w", E.w + "ch");
+    st.setProperty("--r-bg", E.bg); st.setProperty("--r-fg", E.fg);
+    ["font", "size", "ls", "ws", "lh", "w", "bg", "fg", "rate"].forEach(k => { $(k).value = S[k]; });
+    ["ruler", "perLine", "chunks", "nums"].forEach(k => { $(k).checked = S[k]; });
+    reading.classList.toggle("per-line", E.perLine); reading.classList.toggle("chunks", E.chunks); reading.classList.toggle("nums", E.nums);
+    // el panel de opciones solo existe en la vista Ajustable (y en la versión IA, que usa esos ajustes)
+    const showPanel = isAdjustable();
+    $("panel").hidden = !showPanel;
+    $("wrap").classList.toggle("no-panel", !showPanel);
+    $("sizeV").textContent = S.size + " px"; $("lsV").textContent = (+S.ls).toFixed(2) + " em";
+    $("wsV").textContent = (+S.ws).toFixed(2) + " em"; $("lhV").textContent = (+S.lh).toFixed(2); $("wV").textContent = S.w + " caracteres";
+    $("rateV").textContent = (+S.rate).toFixed(2) + "×";
+    const r = ratio(S.bg, S.fg), pill = $("ratioPill");
+    $("ratio").textContent = r.toFixed(1) + " : 1";
+    if (r >= 7) { pill.textContent = "Muy bueno (AAA)"; pill.className = "pill ok"; }
+    else if (r >= 4.5) { pill.textContent = "Suficiente (AA)"; pill.className = "pill ok"; }
+    else { pill.textContent = "Bajo: difícil de leer"; pill.className = "pill warn"; }
+    sw.querySelectorAll(".sw").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.bg.toLowerCase() === S.bg.toLowerCase() && b.dataset.fg.toLowerCase() === S.fg.toLowerCase())));
+    $("odHint").hidden = !S.font.includes("OpenDyslexic");
+    $("rulerBar").hidden = !E.ruler || view === "orig";
+    save();
+  }
+  ["size", "ls", "ws", "lh", "w", "rate"].forEach(k => $(k).addEventListener("input", e => { S[k] = parseFloat(e.target.value); apply(); }));
+  $("font").addEventListener("change", e => { S.font = e.target.value; apply(); });
+  $("bg").addEventListener("input", e => { S.bg = e.target.value; apply(); });
+  $("fg").addEventListener("input", e => { S.fg = e.target.value; apply(); });
+  ["ruler", "perLine", "chunks", "nums"].forEach(k => $(k).addEventListener("change", e => { S[k] = e.target.checked; apply(); }));
+  $("preset").addEventListener("click", () => { Object.assign(S, { size: 20, ls: 0.22, ws: 0.52, lh: 2.0, w: 65 }); apply(); });
+  $("resetAll").addEventListener("click", () => { const rate = S.rate; S = Object.assign({}, DEFAULTS, { rate }); apply(); });
+
+  $("odFile").addEventListener("change", async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { const face = new FontFace("OpenDyslexicUser", await f.arrayBuffer()); await face.load(); document.fonts.add(face); $("odStatus").textContent = " Fuente cargada."; apply(); }
+    catch (err) { $("odStatus").textContent = " No se pudo leer ese archivo de fuente. Probá con el .otf de OpenDyslexic Regular."; }
+  });
+  page.addEventListener("mousemove", e => { if (!S.ruler || !isAdjustable()) return; const r = page.getBoundingClientRect(); $("rulerBar").style.top = (e.clientY - r.top) + "px"; });
+
+  // ---------- adaptación automática ----------
+  const esc = (t) => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const BULLET = /^\s*(?:[•·▪◦●‣∙*–—-]|\d{1,2}[.)]|[a-zA-Z][)])\s+/;
+  const isCaps = (s) => /[A-ZÁÉÍÓÚÑ]{3}/.test(s) && s === s.toUpperCase();
+  const sentenceCase = (s) => { const l = s.toLowerCase(); return l.charAt(0).toUpperCase() + l.slice(1); };
+  const words = (s) => (s.match(/[\p{L}\d]+/gu) || []).length;
+  const LONG = 25;
+
+  // "setenta y cinco por ciento (75%)" -> "75%"
+  const NW = "cero|uno|una|un|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|dieci\\p{L}+|veinte|veinti\\p{L}+|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa|cien|ciento|\\p{L}+cientos|\\p{L}+cientas|mil|millón|millones";
+  const NUMWORDS = new RegExp(`(?<!\\p{L})(?:${NW})(?:\\s+(?:${NW}|y|por))*\\s*\\((\\d[\\d.,]*\\s*%?)\\)`, "giu");
+  const MONTHS = "enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre";
+  const UNITS = "años|año|meses|mes|días|día|horas|hora|minutos|semanas|semana|puntos|punto|pesos|cuotas|cuatrimestres|clases|horas cátedra";
+  const NUMRX = new RegExp(`(?<![\\p{L}\\d])(\\d+(?:[.,]\\d+)*(?:\\s*%)?(?:\\s+de\\s+(?:${MONTHS}))?(?:\\s+(?:${UNITS}))?|(?:lunes|martes|miércoles|jueves|viernes|sábado|domingo)\\s+\\d{1,2}(?:\\s+de\\s+(?:${MONTHS}))?)(?![\\p{L}\\d])`, "giu");
+
+  function splitSentences(p) {
+    return p.split(/(?<=[.!?…]["»”)]?)\s+(?=[\p{Lu}¿¡"«(\d])/u).map(s => s.trim()).filter(Boolean);
+  }
+  function inline(s) {
+    return esc(s).replace(NUMRX, '<span class="n">$1</span>').replace(/\*\*(.+?)\*\*/g, '<span class="k">$1</span>');
+  }
+  function renderSentence(s, st) {
+    const n = words(s);
+    if (n <= LONG) return `<span class="s">${inline(s)}</span>`;
+    st.long++;
+    // tramos: se corta en comas, punto y coma y dos puntos; los pedacitos muy cortos se pegan al anterior
+    const parts = s.split(/(?<=[,;:])\s+/); const chunks = [];
+    parts.forEach(p => { if (chunks.length && (words(p) < 4 || words(chunks[chunks.length - 1]) < 4)) chunks[chunks.length - 1] += " " + p; else chunks.push(p); });
+    st.chunks += chunks.length;
+    return `<span class="s long">${chunks.map(c => `<span class="c">${inline(c)}</span>`).join(" ")}</span>`;
+  }
+  function renderPara(text, st, split = true) {
+    let t = text.replace(NUMWORDS, (m, d) => { st.numw++; return d; });
+    if (isCaps(t) && t.length > 20) { t = sentenceCase(t); st.caps++; }
+    let sents = splitSentences(t);
+    // punto y coma en frases largas -> punto seguido
+    sents = sents.flatMap(s => {
+      if (words(s) <= LONG || !/;\s/.test(s)) return [s];
+      const bits = s.split(/;\s+/).map(b => b.charAt(0).toUpperCase() + b.slice(1));
+      st.semi += bits.length - 1;
+      return bits.map((b, i) => i < bits.length - 1 ? b.replace(/[,\s]*$/, "") + "." : b);
+    });
+    sents.forEach(s => { st.sents++; st.maxAfter = Math.max(st.maxAfter, words(s)); });
+    const groups = [];
+    if (split) {
+      let cur = [];
+      sents.forEach(s => { if (cur.length >= 3 || (cur.length && cur.join(" ").length + s.length > 380)) { groups.push(cur); cur = []; } cur.push(s); });
+      if (cur.length) groups.push(cur);
+      if (groups.length > 1) st.split += groups.length - 1;
+    } else groups.push(sents);
+    return groups.map(g => `<p>${g.map(s => renderSentence(s, st)).join(" ")}</p>`).join("");
+  }
+  const newStats = () => ({ joined: 0, split: 0, caps: 0, hyph: 0, lists: 0, heads: 0, numw: 0, semi: 0, long: 0, chunks: 0, sents: 0, maxAfter: 0, blocksAfter: 0 });
+
+  function autoFormat(raw) {
+    const st = newStats();
+    let txt = raw.replace(/\r\n?/g, "\n").replace(/­/g, "").replace(/[ \t]+/g, " ").replace(/[ ]{2,}/g, " ");
+    txt = txt.replace(/(\p{L})-\n(\p{Ll})/gu, (m, a, b) => { st.hyph++; return a + b; });
+    const lines = txt.split("\n").map(l => l.trim());
+    const maxLen = Math.max(40, ...lines.map(l => l.length));
+    const blocks = []; let para = null, list = null;
+    const endPara = () => { if (para) { blocks.push({ t: "p", text: para.join(" ") }); para = null; } };
+    const endList = () => { if (list) { blocks.push(list); list = null; } };
+    lines.forEach((l, i) => {
+      if (!l) { endPara(); endList(); return; }
+      if (/^#{1,3}\s/.test(l)) { endPara(); endList(); blocks.push({ t: "h", text: l.replace(/^#+\s*/, "") }); return; }
+      if (BULLET.test(l)) {
+        endPara();
+        if (!list) { list = { t: /^\s*\d/.test(l) ? "ol" : "ul", items: [] }; st.lists++; }
+        list.items.push(l.replace(BULLET, "")); return;
+      }
+      const next = lines[i + 1] || "", startsBlock = i === 0 || lines[i - 1] === "";
+      const shortTitle = l.length < 70 && l.split(" ").length <= 10 && !/[.,;!?…]$/.test(l) && /^[\p{Lu}¿¡0-9]/u.test(l);
+      if (next && (!para || isCaps(l)) && ((isCaps(l) && l.length < 90) || (shortTitle && startsBlock))) { endPara(); endList(); blocks.push({ t: "h", text: l.replace(/:$/, "") }); return; }
+      if (list && !para && /^[\p{Ll}(]/u.test(l)) { list.items[list.items.length - 1] += " " + l; return; }
+      endList();
+      if (!para) { para = [l]; return; }
+      const prev = para[para.length - 1];
+      if (/[.!?…:]["»”)]*$/.test(prev) && prev.length < maxLen * 0.7) { endPara(); para = [l]; }
+      else { para.push(l); st.joined++; }
+    });
+    endPara(); endList();
+    let html = "";
+    blocks.forEach(b => {
+      if (b.t === "h") { let t = b.text; if (isCaps(t)) { t = sentenceCase(t); st.caps++; } st.heads++; html += `<h3>${inline(t)}</h3>`; }
+      else if (b.t === "p") html += renderPara(b.text, st);
+      else html += `<${b.t}>` + b.items.map(it => `<li>${renderPara(it, st, false).replace(/^<p>|<\/p>$/g, "")}</li>`).join("") + `</${b.t}>`;
+    });
+    return { html, st };
+  }
+
+  // métricas del texto original, para mostrar el antes y el después
+  function measureRaw(raw) {
+    const flat = raw.replace(/(\p{L})-\n(\p{Ll})/gu, "$1$2").replace(/\s+/g, " ");
+    const sents = splitSentences(flat);
+    const blocks = raw.split(/\n\s*\n+/).filter(b => b.trim()).length;
+    return { maxBefore: Math.max(0, ...sents.map(words)), blocksBefore: blocks };
+  }
+
+  function showReport(st, before) {
+    const r = $("report"); r.innerHTML = "";
+    const blocksAfter = reading.querySelectorAll("h3,p,li").length;
+    const cards = [];
+    if (before) cards.push({ big: `<span class="from">${before.blocksBefore}</span>${blocksAfter}`, txt: "bloques de lectura (antes → ahora)" });
+    if (before && before.maxBefore > LONG) cards.push({ big: `${before.maxBefore}`, txt: `palabras en la frase más larga. Se muestra en ${st.chunks ? "tramos cortos" : "partes"}`, warn: true });
+    if (st.joined + st.hyph) cards.push({ big: st.joined + st.hyph, txt: `cortes de renglón reparados${st.hyph ? ` (${st.hyph} palabras con guion)` : ""}` });
+    if (st.split + st.semi) cards.push({ big: st.split + st.semi, txt: "párrafos o frases divididos" });
+    if (st.numw) cards.push({ big: st.numw, txt: "números escritos en letras pasados a cifras" });
+    if (st.caps) cards.push({ big: st.caps, txt: "textos en MAYÚSCULAS pasados a minúsculas" });
+    if (st.lists + st.heads) cards.push({ big: st.lists + st.heads, txt: "títulos y listas detectados" });
+    cards.slice(0, 6).forEach(c => {
+      const d = document.createElement("div"); d.className = "stat" + (c.warn ? " warn" : "");
+      d.innerHTML = `<b>${c.big}</b><span>${esc(c.txt)}</span>`; r.appendChild(d);
+    });
+  }
+
+  // ---------- vistas: original / adaptado / IA ----------
+  let view = "adapted", origHtml = "", adaptedHtml = "", aiHtml = "", sourceText = "";
+  function render() {
+    page.classList.toggle("orig", view === "orig");
+    if (view === "orig") reading.innerHTML = `<span class="orig-label">Original · así llegó el texto</span>` + origHtml;
+    else reading.innerHTML = view === "ai" && aiHtml ? aiHtml : adaptedHtml;
+    $("viewOrig").setAttribute("aria-pressed", String(view === "orig"));
+    $("viewAdapted").setAttribute("aria-pressed", String(view === "adapted"));
+    $("viewAdjust").setAttribute("aria-pressed", String(view === "adjust"));
+    $("viewAi").setAttribute("aria-pressed", String(view === "ai"));
+    $("viewAi").disabled = !aiHtml && !aiCtl;
+    apply();
+  }
+  function setView(v) { stopSpeak(); view = v; render(); }
+  $("viewOrig").addEventListener("click", () => setView("orig"));
+  $("viewAdapted").addEventListener("click", () => setView("adapted"));
+  $("viewAdjust").addEventListener("click", () => setView("adjust"));
+  $("viewAi").addEventListener("click", () => { if (aiHtml || aiCtl) setView("ai"); });
+
+  function showDoc({ orig, adapted, name, example, st, before }) {
+    cancelAi(); aiHtml = "";
+    origHtml = orig; adaptedHtml = adapted; if (view !== "adjust") view = "adapted"; render();
+    $("docName").textContent = name; $("docTag").hidden = !example;
+    if (st) showReport(st, before); else $("report").innerHTML = "";
+  }
+
+  function adaptText(t, name, opts = {}) {
+    if (!t.trim()) return;
+    stopSpeak();
+    const { html, st } = autoFormat(t);
+    sourceText = t;
+    showDoc({ orig: `<div class="orig-view">${esc(t)}</div>`, adapted: html, name, example: !!opts.example, st, before: measureRaw(t) });
+    if (!opts.example) status("Adaptado automáticamente. Probá las vistas Original y Ajustable.");
+    if (opts.ai && $("autoAi").checked && sample) runAi();
+  }
+
+  // ---------- pegar ----------
+  let deb;
+  box.addEventListener("paste", () => setTimeout(() => { adaptText(box.value, "Texto pegado", { ai: true }); saveText(); }, 0));
+  box.addEventListener("input", e => { if (e.inputType === "insertFromPaste") return; clearTimeout(deb); deb = setTimeout(() => { if (box.value.trim()) { adaptText(box.value, "Texto pegado"); saveText(); } }, 600); });
+  const saveText = () => { try { localStorage.setItem("lectorClaroTexto", box.value.slice(0, 50000)); } catch (e) {} };
+  $("pasteBtn").addEventListener("click", () => { box.focus(); box.select(); box.scrollIntoView({ block: "center", behavior: "smooth" }); });
+  document.addEventListener("paste", e => {
+    if (e.target.closest && e.target.closest("input,textarea,select")) return;
+    const t = e.clipboardData && e.clipboardData.getData("text/plain");
+    if (!t) return; e.preventDefault(); box.value = t; adaptText(t, "Texto pegado", { ai: true }); saveText();
+  });
+
+  // ---------- archivos ----------
+  const status = (msg, err) => { const s = $("status"); s.textContent = msg; s.className = "status" + (err ? " err" : ""); };
+
+  async function pdfToText(buf) {
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let out = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      status(`Leyendo página ${i} de ${pdf.numPages}…`);
+      const tc = await (await pdf.getPage(i)).getTextContent();
+      const lines = []; let cur = null;
+      tc.items.forEach(it => {
+        if (!it.str && !it.hasEOL) return;
+        const y = Math.round(it.transform[5]), h = Math.abs(it.transform[3]) || it.height || 10;
+        if (!cur || Math.abs(cur.y - y) > h * 0.5) { cur = { y, text: "" }; lines.push(cur); }
+        cur.text += it.str; if (it.hasEOL) cur = null;
+      });
+      const clean = lines.map(l => ({ y: l.y, text: l.text.replace(/\s+/g, " ").trim() })).filter(l => l.text);
+      const gaps = clean.slice(1).map((l, k) => Math.abs(clean[k].y - l.y)).sort((a, b) => a - b);
+      const typical = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 14;
+      clean.forEach((l, k) => { if (k > 0 && Math.abs(clean[k - 1].y - l.y) > typical * 1.45) out.push(""); out.push(l.text); });
+      out.push("");
+    }
+    const text = out.join("\n");
+    if (!text.trim()) throw new Error("scan");
+    return text;
+  }
+
+  async function docxAdapt(buf) {
+    const res = await mammoth.convertToHtml({ arrayBuffer: buf });
+    const tpl = document.createElement("template"); tpl.innerHTML = res.value;
+    tpl.content.querySelectorAll("script,style,iframe").forEach(n => n.remove());
+    tpl.content.querySelectorAll("*").forEach(n => [...n.attributes].forEach(a => { if (/^on/i.test(a.name) || a.name === "style") n.removeAttribute(a.name); }));
+    const origDiv = document.createElement("div"); origDiv.appendChild(tpl.content.cloneNode(true));
+    const st = newStats(); let html = "", rawForMeasure = "";
+    [...tpl.content.children].forEach(el => {
+      const tag = el.tagName.toLowerCase(), text = el.textContent.replace(/\s+/g, " ").trim();
+      if (!text && !el.querySelector("img")) return;
+      if (/^h[1-6]$/.test(tag)) { let t = text; if (isCaps(t)) { t = sentenceCase(t); st.caps++; } st.heads++; html += `<h3>${inline(t)}</h3>`; rawForMeasure += "\n\n" + text; }
+      else if (tag === "ul" || tag === "ol") { st.lists++; html += `<${tag}>` + [...el.querySelectorAll(":scope > li")].map(li => `<li>${renderPara(li.textContent.replace(/\s+/g, " ").trim(), st, false).replace(/^<p>|<\/p>$/g, "")}</li>`).join("") + `</${tag}>`; rawForMeasure += "\n\n" + text; }
+      else if (tag === "p") { html += renderPara(text, st); rawForMeasure += "\n\n" + text; }
+      else html += el.outerHTML;
+    });
+    return { orig: `<div class="orig-view" style="white-space:normal">${origDiv.innerHTML}</div>`, adapted: html, st, before: measureRaw(rawForMeasure) };
+  }
+
+  async function openFile(f) {
+    stopSpeak();
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    status("Abriendo " + f.name + "…");
+    try {
+      if (ext === "pdf") adaptText(await pdfToText(await f.arrayBuffer()), f.name, { ai: true });
+      else if (ext === "txt" || ext === "md" || f.type.startsWith("text/")) adaptText(await f.text(), f.name, { ai: true });
+      else if (ext === "docx") { const r = await docxAdapt(await f.arrayBuffer()); sourceText = ""; showDoc({ ...r, name: f.name }); if ($("autoAi").checked && sample) runAi(); }
+      else if (ext === "doc") throw new Error("doc");
+      else throw new Error("tipo");
+      status("Listo. Probá las vistas Original y Ajustable.");
+      reading.focus({ preventScroll: true });
+    } catch (err) {
+      status(err.message === "scan" ? "Este PDF no tiene texto seleccionable (parece un escaneo). Pasalo antes por un OCR y volvé a abrirlo."
+        : err.message === "doc" ? "Los .doc antiguos no se pueden leer. Guardalo como .docx desde Word y probá de nuevo."
+        : err.message === "tipo" ? "Ese tipo de archivo no es compatible. Usá PDF, .docx o .txt."
+        : "No se pudo abrir el archivo. Revisá que no esté dañado o protegido con contraseña.", true);
+    }
+  }
+  $("file").addEventListener("change", e => { if (e.target.files[0]) openFile(e.target.files[0]); e.target.value = ""; });
+  const drop = $("drop");
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]); });
+
+  // ---------- voz alta ----------
+  let speaking = false;
+  function stopSpeak() {
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    speaking = false; $("speakBtn").setAttribute("aria-pressed", "false"); $("speakBtn").textContent = "Leer en voz alta";
+    reading.querySelectorAll(".speaking").forEach(n => n.classList.remove("speaking"));
+  }
+  $("speakBtn").addEventListener("click", () => {
+    if (!("speechSynthesis" in window)) { status("Tu navegador no permite leer en voz alta.", true); return; }
+    if (speaking) { stopSpeak(); return; }
+    const blocks = [...reading.querySelectorAll("h3,p,li,td,.orig-view")].filter(n => n.textContent.trim());
+    if (!blocks.length) return;
+    speaking = true; $("speakBtn").setAttribute("aria-pressed", "true"); $("speakBtn").textContent = "Detener lectura";
+    const voice = speechSynthesis.getVoices().find(v => /^es/i.test(v.lang));
+    let i = 0;
+    const next = () => {
+      reading.querySelectorAll(".speaking").forEach(n => n.classList.remove("speaking"));
+      if (!speaking || i >= blocks.length) { stopSpeak(); return; }
+      const b = blocks[i++]; b.classList.add("speaking"); b.scrollIntoView({ block: "center", behavior: "smooth" });
+      const u = new SpeechSynthesisUtterance(b.textContent); u.lang = voice ? voice.lang : "es-ES"; if (voice) u.voice = voice; u.rate = S.rate;
+      u.onend = next; u.onerror = () => stopSpeak(); speechSynthesis.speak(u);
+    };
+    next();
+  });
+
+  // ---------- IA (opcional; usa la cuenta de Claude de quien abre la página) ----------
+  let sample = null, aiCtl = null;
+  function cancelAi() { if (aiCtl) aiCtl.abort(); aiCtl = null; $("aiStop").hidden = true; $("aiRun").disabled = false; }
+  $("aiStop").addEventListener("click", cancelAi);
+  $("aiRun").addEventListener("click", runAi);
+  $("autoAi").addEventListener("change", e => { try { localStorage.setItem("lectorClaroIA", e.target.checked ? "1" : "0"); } catch (err) {} });
+  const AI_ERR = {
+    not_granted: "No se dio permiso para usar la IA. El texto adaptado sigue disponible.",
+    sampling_disabled: "La IA no está disponible para esta cuenta.",
+    rate_limited: "Se alcanzó el límite de uso por ahora. Probá de nuevo en un rato.",
+    session_expired: "Tu sesión venció. Volvé a iniciar sesión en Claude.",
+    prompt_too_large: "El texto es muy largo para simplificarlo de una vez. Pegá una parte más corta.",
+    refused: "La IA no pudo simplificar este texto.",
+  };
+  function mdToHtml(md) {
+    const st = newStats();
+    return md.replace(/\r/g, "").split(/\n\s*\n+/).map(b => b.trim()).filter(Boolean).map(b => {
+      const ls = b.split("\n").map(l => l.trim()).filter(Boolean);
+      if (ls.every(l => BULLET.test(l))) { const tag = /^\d/.test(ls[0]) ? "ol" : "ul"; return `<${tag}>` + ls.map(l => `<li>${renderPara(l.replace(BULLET, ""), st, false).replace(/^<p>|<\/p>$/g, "")}</li>`).join("") + `</${tag}>`; }
+      return ls.map(l => /^#{1,4}\s/.test(l) ? `<h3>${inline(l.replace(/^#+\s*/, ""))}</h3>` : BULLET.test(l) ? `<ul><li>${inline(l.replace(BULLET, ""))}</li></ul>` : renderPara(l, st, false)).join("");
+    }).join("");
+  }
+  async function runAi() {
+    if (!sample) return;
+    let plain = sourceText;
+    if (!plain.trim()) { const d = document.createElement("div"); d.innerHTML = adaptedHtml; plain = [...d.querySelectorAll("h3,p,li,td")].map(n => n.textContent.trim()).filter(Boolean).join("\n\n"); }
+    const src = plain.slice(0, 20000); if (!src.trim()) return;
+    cancelAi(); stopSpeak();
+    aiCtl = new AbortController(); const ctl = aiCtl;
+    $("aiStop").hidden = false; $("aiRun").disabled = true; $("aiMsg").textContent = "Simplificando…";
+    aiHtml = ""; view = "ai"; render(); reading.innerHTML = "<p>Pensando…</p>";
+    const prompt = `Reescribí el siguiente texto en español para una persona con dislexia, en lectura fácil.
+Reglas:
+- Conservá TODA la información, los datos, nombres, fechas y números. No agregues opiniones ni información nueva.
+- Frases cortas (idealmente menos de 20 palabras), en voz activa, una idea por frase.
+- Palabras comunes en lugar de técnicas; si un término técnico es necesario, explicalo entre paréntesis la primera vez.
+- Párrafos de 2 o 3 frases como máximo.
+- Si hay pasos, requisitos o enumeraciones, convertilos en lista con "- " al inicio de cada renglón.
+- Usá títulos cortos con "## " cuando el texto cambie de tema.
+- Marcá con **negrita** una o dos palabras clave por párrafo, no más.
+- Escribí los números con cifras. Sin cursivas, sin MAYÚSCULAS sostenidas, sin tablas.
+Respondé solo con el texto reescrito, separando párrafos con una línea en blanco.
+
+TEXTO:
+"""
+${src}
+"""`;
+    try {
+      const { text, truncated } = await sample(prompt, { signal: ctl.signal, onText: ({ text }) => { aiHtml = mdToHtml(text); if (view === "ai") reading.innerHTML = aiHtml; } });
+      aiHtml = mdToHtml(text); if (view === "ai") reading.innerHTML = aiHtml;
+      $("aiMsg").textContent = truncated ? "Quedó cortado: pegá una parte más corta para ver el resto." : (plain.length > 20000 ? "Listo. Se simplificaron los primeros 20.000 caracteres." : "Listo.");
+    } catch (e) {
+      const code = e && e.code;
+      if (code === "cancelled") { $("aiMsg").textContent = "Detenido."; aiHtml = e.text ? mdToHtml(e.text) : aiHtml; }
+      else {
+        $("aiMsg").textContent = AI_ERR[code] || "No se pudo simplificar. Probá de nuevo.";
+        aiHtml = e && e.text ? mdToHtml(e.text) : "";
+        if (code === "not_granted" || code === "sampling_disabled") { sample = null; $("autoAiWrap").hidden = true; $("aiRun").hidden = true; }
+      }
+    } finally {
+      if (aiCtl === ctl) aiCtl = null;
+      $("aiStop").hidden = true; $("aiRun").disabled = false;
+      if (!aiHtml && view === "ai") view = "adapted";
+      if (view === "ai" && aiHtml) reading.innerHTML = aiHtml; else render();
+      $("viewAi").disabled = !aiHtml;
+    }
+  }
+  (async () => {
+    try { sample = window.claude && window.claude.use ? await window.claude.use("sample") : null; } catch (e) { sample = null; }
+    if (!sample) return;
+    $("autoAiWrap").hidden = false; $("viewAi").hidden = false; $("aiState").hidden = false; $("viewAi").disabled = !aiHtml;
+    let pref = null; try { pref = localStorage.getItem("lectorClaroIA"); } catch (e) {}
+    $("autoAi").checked = pref !== "0";
+  })();
+
+  // ---------- inicio ----------
+  apply();
+  let last = null; try { last = localStorage.getItem("lectorClaroTexto"); } catch (e) {}
+  if (last && last.trim()) { box.value = last; adaptText(last, "Último texto pegado"); }
+  else adaptText(SAMPLE, "Reglamento de regularidad", { example: true });
+})();
+</script>
+
+</body>
+</html>
